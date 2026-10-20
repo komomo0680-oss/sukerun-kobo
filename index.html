@@ -36,6 +36,8 @@ small{opacity:.7}
 input.nm{flex:1;min-width:0;font:inherit;font-size:17px;font-weight:600;background:transparent;color:var(--fg);border:0;border-bottom:1px solid var(--bd);padding:4px}
 #pk{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);align-items:center;justify-content:center;z-index:9}
 #pk .box{background:var(--card);padding:16px;border-radius:14px;width:min(90%,340px)}#pk select{width:100%;margin:10px 0}
+body.mgr{background:#000;color:#eee;--bg:#000;--fg:#eee;--card:#1c1c1c;--bd:#333}
+.cell button.dl{top:auto;bottom:2px;left:2px;right:auto;border-radius:8px;line-height:18px}
 </style></head><body>
 <h1>すけるん工房 <small>スタンプ制作</small></h1>
 <div class="tabs"><button id="t1" class="on">背景透過</button><button id="t2">スタンプ管理</button></div>
@@ -173,15 +175,19 @@ const dbOpen=()=>new Promise(r=>{try{const q=indexedDB.open('stampmgr',1);q.onup
 const dbLoad=()=>new Promise(r=>{if(!db)return r();try{const g=db.transaction('kv').objectStore('kv').get('s');g.onsuccess=()=>{if(g.result)S=g.result;r()};g.onerror=()=>r()}catch(e){r()}});
 const sv=()=>{try{if(db)db.transaction('kv','readwrite').objectStore('kv').put(S,'s')}catch(e){}};
 async function shrink(f,m){const im=await readImg(f),k=Math.min(1,m/Math.max(im.width,im.height)),c=mk(Math.round(im.width*k),Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);return c.toDataURL('image/png')}
-function tab(n){$('tA').style.display=n==1?'':'none';$('tB').style.display=n==2?'':'none';$('t1').className=n==1?'on':'';$('t2').className=n==2?'on':'';if(n==2)mhome()}
+function tab(n){document.body.classList.toggle('mgr',n==2);$('tA').style.display=n==1?'':'none';$('tB').style.display=n==2?'':'none';$('t1').className=n==1?'on':'';$('t2').className=n==2?'on':'';if(n==2)mhome()}
 $('t1').onclick=()=>tab(1);$('t2').onclick=()=>tab(2);
 function newSet(){const s={id:'s'+Date.now(),name:'新しいスタンプ',main:'',stamps:[]};S.sets.push(s);sv();return s}
 function mhome(){cur=null;$('mg').innerHTML='<div class="sgrid">'+S.sets.map(s=>{const ic=s.main||s.stamps[0];return '<div class="sc" onclick="mopen(\''+s.id+'\')">'+(ic?'<img class="ic" src="'+ic+'">':'<div class="ic">画像なし</div>')+'<b>'+esc(s.name)+'</b><small>'+s.stamps.length+'個</small></div>'}).join('')+'<div class="sc add" onclick="mopen(newSet().id)">＋<small>新しいセット</small></div></div>'+(S.sets.length?'<small>アイコンをタップすると中身を一覧で見られます</small>':'<small>「背景透過」で作った画像を、セットに追加できます</small>')}
 function mopen(id){cur=S.sets.find(s=>s.id===id);mdetail()}
 function mdetail(){const s=cur;$('mg').innerHTML='<div class="row"><button onclick="mhome()">‹ 戻る</button><input class="nm" value="'+esc(s.name)+'" onchange="cur.name=this.value;sv()"></div>'
 +'<div class="row">'+(s.main?'<img src="'+s.main+'" style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid var(--bd)">':'')+'<button onclick="$(\'fMain\').click()">トップ画像を'+(s.main?'変更':'選ぶ')+'</button><button class="on" onclick="$(\'fSt\').click()">＋ スタンプを追加</button></div>'
-+'<small>'+s.stamps.length+'個</small><div class="sgrid" style="margin-top:6px">'+s.stamps.map((d,i)=>'<div class="cell"><img src="'+d+'"><i>'+(i+1)+'</i><button onclick="mdel('+i+')">×</button></div>').join('')+'</div>'
-+'<div class="row"><button onclick="mdelSet()" style="color:#d33">このセットを削除</button></div>'}
++'<small>'+s.stamps.length+'個</small><div class="sgrid" style="margin-top:6px">'+s.stamps.map((d,i)=>'<div class="cell"><img src="'+d+'"><i>'+(i+1)+'</i><button onclick="mdel('+i+')">×</button><button class="dl" onclick="msave([cur.stamps['+i+']],cur.name)">⬇</button></div>').join('')+'</div>'
++'<div class="row">'+(s.stamps.length?'<button onclick="msave(cur.stamps,cur.name)">⬇ 全部保存</button>':'')+'<button onclick="mdelSet()" style="color:#d33">このセットを削除</button></div>'}
+async function msave(urls,base){
+ const fs=await Promise.all(urls.map(async(u,i)=>new File([await (await fetch(u)).blob()],base+'_'+String(i+1).padStart(2,'0')+'.png',{type:'image/png'})));
+ if(navigator.canShare&&navigator.canShare({files:fs})){try{await navigator.share({files:fs});return}catch(e){if(e.name==='AbortError')return}}
+ for(const f of fs)await saveFile(f.name,f)}
 function mdel(i){if(confirm('このスタンプを削除しますか？')){cur.stamps.splice(i,1);sv();mdetail()}}
 function mdelSet(){if(confirm('セットごと削除しますか？')){S.sets=S.sets.filter(s=>s!==cur);sv();mhome()}}
 $('fMain').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;cur.main=await shrink(f,240);sv();mdetail()};
