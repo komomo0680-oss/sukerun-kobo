@@ -1,43 +1,146 @@
-<!doctype html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#6d5bd0">
-<title>すけるん工房｜背景透過</title>
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>すけるん工房</title>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="theme-color" content="#06c755">
 <style>
-:root{--p:#6d5bd0;--ink:#282144;--bg:#f6f4ff;--line:#e1dcf5}
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--ink)}
-header{padding:18px 16px;background:white;border-bottom:1px solid var(--line)}h1{font-size:22px;margin:0}header p{margin:5px 0 0;color:#6b6680;font-size:13px}
-main{max-width:900px;margin:auto;padding:16px;display:grid;gap:14px}.panel{background:white;border:1px solid var(--line);border-radius:16px;padding:14px}
-.controls,.row,.mode{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.btn{border:1px solid var(--line);background:white;color:var(--ink);border-radius:11px;padding:11px 13px;font-weight:650;font-size:14px}.primary{background:var(--p);color:white;border-color:var(--p)}button:disabled{opacity:.45}.btn input{display:none}
-.stage{min-height:260px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:12px;background-color:#fff;background-image:linear-gradient(45deg,#e7e7e7 25%,transparent 25%),linear-gradient(-45deg,#e7e7e7 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e7e7e7 75%),linear-gradient(-45deg,transparent 75%,#e7e7e7 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
-canvas{max-width:100%;max-height:58vh;touch-action:none}.empty{padding:48px 20px;text-align:center;color:#77718d}.status,.hint,.foot{font-size:12px;color:#77718d;line-height:1.7;margin-top:10px}.status{color:var(--p);min-height:20px}.selected{background:#eeeaff;border-color:#a89ce8}
-</style></head>
-<body>
-<header><h1>✂️ すけるん工房</h1><p>背景を自動で消して、指で細かく修正できる画像編集ツール</p></header>
-<main>
-<section class="panel"><div class="controls"><label class="btn primary">画像を選ぶ<input id="file" type="file" accept="image/*"></label><button class="btn primary" id="auto" disabled>✨ 自動で背景を消す</button><button class="btn" id="save" disabled>透過PNGで保存</button></div><div class="status" id="status">まず画像を選んでね。</div></section>
-<section class="panel"><div class="stage"><div class="empty" id="empty"><b>ここに画像が表示されます</b><br>写真やイラストを選んでね</div><canvas id="canvas" hidden></canvas></div>
-<div class="row" style="margin-top:14px"><b style="font-size:13px">修正モード</b><div class="mode"><button class="btn selected" data-mode="erase">消す</button><button class="btn" data-mode="restore">元に戻す</button></div><label>筆の太さ <b id="sizeText">24</b> px</label><input id="size" type="range" min="4" max="100" value="24"><button class="btn" id="undo" disabled>↶ 1回戻す</button><button class="btn" id="reset" disabled>最初の状態</button></div><p class="hint">自動削除後、画像の上を指やマウスでなぞって修正できます。「消す」は透明に、「元に戻す」は元画像を復元します。</p></section>
-<div class="foot">試作版です。初回はAIモデルのダウンロードに時間がかかる場合があります。画像処理は基本的にブラウザ内で行います。</div>
-</main>
-<script type="module">
-const $=id=>document.getElementById(id),file=$('file'),canvas=$('canvas'),ctx=canvas.getContext('2d'),status=$('status'),empty=$('empty');
-let original=null,originalCanvas=null,mode='erase',drawing=false,last=null,history=[];
-const brush=()=>Number($('size').value),say=t=>status.textContent=t;
-function snapshot(){try{history.push(ctx.getImageData(0,0,canvas.width,canvas.height));if(history.length>12)history.shift();$('undo').disabled=false}catch(e){}}
-function drawOriginal(){if(originalCanvas)ctx.drawImage(originalCanvas,0,0)}
-file.addEventListener('change',()=>{const f=file.files?.[0];if(!f)return;if(!f.type.startsWith('image/')){say('画像ファイルを選んでね。');return}const url=URL.createObjectURL(f),img=new Image();img.onload=()=>{original=img;canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;originalCanvas=document.createElement('canvas');originalCanvas.width=canvas.width;originalCanvas.height=canvas.height;originalCanvas.getContext('2d').drawImage(img,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);drawOriginal();canvas.hidden=false;empty.hidden=true;history=[];$('auto').disabled=false;$('save').disabled=false;$('undo').disabled=true;$('reset').disabled=false;say(`画像を読み込みました（${canvas.width} × ${canvas.height} px）。自動削除を押してね。`);URL.revokeObjectURL(url)};img.onerror=()=>say('画像を読み込めませんでした。別の画像を試してね。');img.src=url});
-$('auto').addEventListener('click',async()=>{if(!original)return;const btn=$('auto');btn.disabled=true;say('AIモデルを準備しています。初回は少し時間がかかるよ…');try{const {removeBackground}=await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm');say('背景を自動で削除中…');const inputBlob=await new Promise((resolve,reject)=>originalCanvas.toBlob(b=>b?resolve(b):reject(new Error('画像を変換できませんでした')),'image/png'));const blob=await removeBackground(inputBlob,{publicPath:'https://staticimgly.com/@imgly/background-removal-data/1.5.5/dist/',model:'isnet_quint8',debug:true});const u=URL.createObjectURL(blob),cut=new Image();cut.onload=()=>{snapshot();ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(cut,0,0,canvas.width,canvas.height);URL.revokeObjectURL(u);say('できたよ！画像をなぞって細かく修正してね。');btn.disabled=false};cut.onerror=()=>{say('処理結果を読み込めませんでした。もう一度試してね。');btn.disabled=false};cut.src=u}catch(e){console.error('すけるん工房 自動削除エラー:',e);const detail=e?.message||String(e);say('自動削除エラー：'+detail.slice(0,180)+'（画面を更新して再試行してね）');btn.disabled=false}});
-document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('selected',x===b))}));
-$('size').addEventListener('input',()=>$('sizeText').textContent=brush());
-function point(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)}}
-function stroke(a,b){ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.lineWidth=brush()*(canvas.width/canvas.getBoundingClientRect().width);if(mode==='erase'){ctx.globalCompositeOperation='destination-out';ctx.strokeStyle='rgba(0,0,0,1)';ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke()}else{ctx.globalCompositeOperation='source-over';ctx.drawImage(originalCanvas,0,0);ctx.globalCompositeOperation='destination-in';ctx.beginPath();ctx.arc(b.x,b.y,ctx.lineWidth/2,0,Math.PI*2);ctx.fill()}ctx.restore()}
-canvas.addEventListener('pointerdown',e=>{if(!original)return;drawing=true;canvas.setPointerCapture(e.pointerId);snapshot();last=point(e);stroke(last,last)});
-canvas.addEventListener('pointermove',e=>{if(!drawing||!last)return;const p=point(e);stroke(last,p);last=p});function end(){drawing=false;last=null}
-$('undo').addEventListener('click',()=>{const s=history.pop();if(s)ctx.putImageData(s,0,0);$('undo').disabled=!history.length;say('ひとつ前の状態に戻したよ。')});
-$('reset').addEventListener('click',()=>{if(!originalCanvas)return;snapshot();ctx.clearRect(0,0,canvas.width,canvas.height);drawOriginal();say('元の画像に戻したよ。')});
-canvas.addEventListener('pointerup',end);canvas.addEventListener('pointercancel',end);canvas.addEventListener('pointerleave',()=>{if(drawing)end()});
-$('save').addEventListener('click',()=>{if(!canvas.width)return;canvas.toBlob(blob=>{if(!blob){say('PNG保存に失敗しました。');return}const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='sukerun-transparent.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);say('透過PNGを保存したよ！')},'image/png')});
+:root{--bg:#f6f6f2;--fg:#222;--card:#fff;--ac:#06c755;--bd:#d8d8d0;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1a1a1a;--fg:#eee;--card:#2a2a2a;--bd:#444}}
+:root[data-theme="dark"]{--bg:#1a1a1a;--fg:#eee;--card:#2a2a2a;--bd:#444}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,"Hiragino Sans",sans-serif;padding:12px}
+h1{font-size:18px;margin:0 0 10px}h2{font-size:15px;margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:10px;margin-bottom:10px}
+button,select{font:inherit;color:var(--fg);background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:8px 12px;cursor:pointer}
+button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+button.main{background:var(--ac);color:#fff;border-color:var(--ac);width:100%;margin-top:8px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.ck{background-color:#fff;background-image:linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%);background-size:16px 16px;background-position:0 0,8px 8px}
+.wrap{overflow:auto;max-height:60vh;border-radius:8px}
+canvas{display:block;max-width:100%;touch-action:none}
+input[type=range]{flex:1;min-width:100px}
+#out img,#grid img{max-width:100%;border:1px solid var(--bd)}
+#grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+small{opacity:.7}
+</style></head><body>
+<h1>すけるん工房 <small>スタンプ背景透過</small></h1>
+<div class="card"><h2>① 1枚ずつ仕上げる</h2>
+  <div class="row"><div style="width:100%">画像を選ぶ：<input id="file" type="file" accept="image/*"></div><div style="width:100%">カメラで撮る：<input id="cam" type="file" accept="image/*" capture="environment"></div><button id="undo">↩ 戻す</button></div>
+  <div class="row"><button id="auto" class="main" style="margin:0">✨ 自動で背景を透過</button></div>
+  <div class="row"><button id="mFill" class="on">色で透過</button><button id="mErase">消しゴム</button></div>
+  <div class="row"><span>許容</span><input id="tol" type="range" min="0" max="100" value="20"><label><input id="glob" type="checkbox"> 同じ色を全部</label></div>
+  <div class="row"><span>太さ</span><input id="bs" type="range" min="3" max="80" value="20"></div>
+  <div class="wrap ck"><canvas id="cv" width="300" height="200"></canvas></div>
+</div>
+<div class="card"><h2>書き出し設定（①②共通）</h2>
+  <div class="row"><span>サイズ</span><select id="sz"><option value="370x320">スタンプ 370×320</option><option value="240x240">メイン 240×240</option><option value="96x74">タブ 96×74</option><option value="192x192">アイコン 192×192</option><option value="512x512">アイコン 512×512</option><option value="custom">自由に入力</option><option value="0x0">余白カットのみ</option></select></div>
+  <div class="row" id="cr" style="display:none"><span>幅</span><input id="cw" type="number" min="16" max="2000" value="512" style="width:80px"><span>×　高さ</span><input id="ch2" type="number" min="16" max="2000" value="512" style="width:80px"><span>px</span></div>
+  <div class="row"><label><input id="bd" type="checkbox" checked> 白フチ</label><span>太さ</span><input id="bw" type="range" min="2" max="20" value="8"></div>
+  <button id="exp" class="main">① の画像を書き出す</button>
+  <div id="out" style="margin-top:8px"></div>
+</div>
+<div class="card"><h2>② まとめて処理（自動透過）</h2>
+  <div class="row"><input id="multi" type="file" accept="image/*" multiple></div>
+  <small>複数選ぶと、許容の値で自動透過→サイズ調整→白フチまで一気に行います。ファイル名順に stamp_01 から番号が付きます。</small>
+  <div id="bmsg" style="margin:8px 0"></div><div id="grid"></div>
+  <button id="zipb" class="main" style="display:none">ZIPでまとめて保存</button>
+</div>
+<script>
+const $=id=>document.getElementById(id),cv=$('cv'),cx=cv.getContext('2d',{willReadFrequently:true}),tol=$('tol');
+const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+let mode='fill',undo=[],drawing=false,DL=null,B=[],lastOut=null;
+(async()=>{try{DL=await claude.use('downloads')}catch(e){}})();
+async function saveFile(name,blob){
+  if(DL){try{await DL.save({filename:name,data:blob})}catch(e){}return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),5000)}
+function snap(){try{undo.push(cx.getImageData(0,0,cv.width,cv.height));if(undo.length>15)undo.shift()}catch(e){}}
+$('undo').onclick=()=>{const s=undo.pop();if(s)cx.putImageData(s,0,0)};
+$('mFill').onclick=()=>{mode='fill';$('mFill').className='on';$('mErase').className=''};
+$('mErase').onclick=()=>{mode='erase';$('mErase').className='on';$('mFill').className=''};
+function readImg(f){return new Promise((ok,ng)=>{const fr=new FileReader();fr.onerror=ng;fr.onload=()=>{const im=new Image();im.onload=()=>ok(im);im.onerror=ng;im.src=fr.result};fr.readAsDataURL(f)})}
+function toCv(im){const k=Math.min(1,1200/Math.max(im.width,im.height)),c=mk(Math.round(im.width*k),Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);return c}
+async function load(f){if(!f)return;try{const c=toCv(await readImg(f));cv.width=c.width;cv.height=c.height;cx.clearRect(0,0,c.width,c.height);cx.drawImage(c,0,0);undo=[]}catch(e){$('out').textContent='この画像は読み込めませんでした'}}
+$('file').onchange=e=>{load(e.target.files[0]);e.target.value=''};
+$('cam').onchange=e=>{load(e.target.files[0]);e.target.value=''};
+addEventListener('paste',e=>{const it=[...(e.clipboardData?.items||[])].find(i=>i.type.startsWith('image/'));if(it)load(it.getAsFile())});
+addEventListener('dragover',e=>e.preventDefault());
+addEventListener('drop',e=>{e.preventDefault();load(e.dataTransfer.files[0])});
+function pos(e){const r=cv.getBoundingClientRect();return[Math.floor((e.clientX-r.left)*cv.width/r.width),Math.floor((e.clientY-r.top)*cv.height/r.height)]}
+function fill(x,y){
+  const w=cv.width,h=cv.height,im=cx.getImageData(0,0,w,h),d=im.data,i0=(y*w+x)*4;
+  if(d[i0+3]===0)return;snap();
+  const r=d[i0],g=d[i0+1],b=d[i0+2],t=tol.value*4.41,t2=t*t;
+  const ok=i=>d[i+3]>0&&((d[i]-r)**2+(d[i+1]-g)**2+(d[i+2]-b)**2)<=t2;
+  if($('glob').checked){for(let i=0;i<d.length;i+=4)if(ok(i))d[i+3]=0}
+  else{const seen=new Uint8Array(w*h),st=[y*w+x];seen[y*w+x]=1;
+    while(st.length){const p=st.pop(),px=p%w,py=(p-px)/w;d[p*4+3]=0;
+      for(const[n,c]of[[p-1,px>0],[p+1,px<w-1],[p-w,py>0],[p+w,py<h-1]])if(c&&!seen[n]&&ok(n*4)){seen[n]=1;st.push(n)}}}
+  cx.putImageData(im,0,0)}
+function erase(x,y){cx.save();cx.globalCompositeOperation='destination-out';cx.beginPath();cx.arc(x,y,+$('bs').value/2,0,7);cx.fill();cx.restore()}
+function autoKey(c,tv){
+  const w=c.width,h=c.height,g=c.getContext('2d',{willReadFrequently:true}),im=g.getImageData(0,0,w,h),d=im.data;
+  const cs=[[0,0],[w-1,0],[0,h-1],[w-1,h-1]].map(([x,y])=>{const i=(y*w+x)*4;return[d[i],d[i+1],d[i+2],d[i+3]]}).filter(q=>q[3]>0);
+  if(!cs.length)return;
+  const t=tv*4.41,t2=t*t,seen=new Uint8Array(w*h),st=[];
+  const ok=i=>{if(d[i+3]===0)return false;for(const q of cs)if((d[i]-q[0])**2+(d[i+1]-q[1])**2+(d[i+2]-q[2])**2<=t2)return true;return false};
+  const add=p=>{if(!seen[p]&&ok(p*4)){seen[p]=1;st.push(p)}};
+  for(let x=0;x<w;x++){add(x);add((h-1)*w+x)}
+  for(let y=0;y<h;y++){add(y*w);add(y*w+w-1)}
+  while(st.length){const p=st.pop(),px=p%w,py=(p-px)/w;d[p*4+3]=0;
+    if(px>0)add(p-1);if(px<w-1)add(p+1);if(py>0)add(p-w);if(py<h-1)add(p+w)}
+  g.putImageData(im,0,0)}
+$('auto').onclick=()=>{snap();autoKey(cv,+tol.value)};
+cv.onpointerdown=e=>{e.preventDefault();const[x,y]=pos(e);
+  if(mode==='fill')fill(x,y);else{snap();drawing=true;cv.setPointerCapture(e.pointerId);erase(x,y)}};
+cv.onpointermove=e=>{if(drawing){const[x,y]=pos(e);erase(x,y)}};
+cv.onpointerup=cv.onpointercancel=()=>{drawing=false};
+function outline(im,b){
+  const o=mk(im.width+2*b,im.height+2*b),c=o.getContext('2d'),s=mk(im.width,im.height),sc=s.getContext('2d');
+  sc.drawImage(im,0,0);sc.globalCompositeOperation='source-in';sc.fillStyle='#fff';sc.fillRect(0,0,s.width,s.height);
+  for(const r of[b,b*.7,b*.4])for(let a=0;a<360;a+=10)c.drawImage(s,b+Math.cos(a*Math.PI/180)*r,b+Math.sin(a*Math.PI/180)*r);
+  c.drawImage(im,b,b);return o}
+function makeOut(s){
+  const w=s.width,h=s.height,d=s.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;let x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(d[(y*w+x)*4+3]>8){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+  if(x1<0)return null;
+  const cw=x1-x0+1,ch=y1-y0+1,[W,H]=sizeVal(),b=$('bd').checked?+$('bw').value:0,m=W>100?10:4;
+  const k=W?Math.min((W-2*m-2*b)/cw,(H-2*m-2*b)/ch):1,dw=Math.max(1,Math.round(cw*k)),dh=Math.max(1,Math.round(ch*k)),im=mk(dw,dh),c=im.getContext('2d');
+  c.imageSmoothingQuality='high';c.drawImage(s,x0,y0,cw,ch,0,0,dw,dh);
+  const f=b?outline(im,b):im,o=mk(W||f.width,H||f.height);
+  o.getContext('2d').drawImage(f,Math.round((o.width-f.width)/2),Math.round((o.height-f.height)/2));return o}
+function sizeVal(){const v=$('sz').value;if(v==='custom'){const f=id=>Math.min(2000,Math.max(16,+$(id).value||512));return[f('cw'),f('ch2')]}return v.split('x').map(Number)}
+$('sz').onchange=()=>{$('cr').style.display=$('sz').value==='custom'?'flex':'none'};
+const blobOf=c=>new Promise(r=>c.toBlob(r,'image/png'));
+$('exp').onclick=async()=>{
+  const o=makeOut(cv);if(!o){$('out').textContent='画像がありません';return}
+  lastOut=await blobOf(o);
+  $('out').innerHTML='<div class="ck" style="display:inline-block"><img src="'+o.toDataURL('image/png')+'"></div><div><small>長押し（PCは右クリック）でも保存できます。</small></div><button id="sv" class="main">この画像を保存</button>';
+  $('sv').onclick=()=>saveFile('stamp.png',lastOut)};
+const crcT=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc=u=>{let c=-1;for(const b of u)c=crcT[(c^b)&255]^(c>>>8);return(~c)>>>0};
+function zip(fs){
+  const E=new TextEncoder(),P=[],C=[];let o=0;
+  for(const f of fs){const n=E.encode(f.name),c=crc(f.data),s=f.data.length;
+    const h=new DataView(new ArrayBuffer(30));h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint32(14,c,true);h.setUint32(18,s,true);h.setUint32(22,s,true);h.setUint16(26,n.length,true);
+    P.push(h,n,f.data);
+    const d=new DataView(new ArrayBuffer(46));d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint16(8,0x0800,true);d.setUint32(16,c,true);d.setUint32(20,s,true);d.setUint32(24,s,true);d.setUint16(28,n.length,true);d.setUint32(42,o,true);
+    C.push(d,n);o+=30+n.length+s}
+  const cl=C.reduce((a,x)=>a+x.byteLength,0),e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,fs.length,true);e.setUint16(10,fs.length,true);e.setUint32(12,cl,true);e.setUint32(16,o,true);
+  return new Blob([...P,...C,e],{type:'application/zip'})}
+$('multi').onchange=async e=>{
+  const fs=[...e.target.files].sort((a,b)=>a.name.localeCompare(b.name,'ja',{numeric:true}));e.target.value='';
+  B=[];$('grid').innerHTML='';$('zipb').style.display='none';
+  for(let i=0;i<fs.length;i++){
+    $('bmsg').textContent='処理中… '+(i+1)+' / '+fs.length;
+    try{const c=toCv(await readImg(fs[i]));autoKey(c,+tol.value);const o=makeOut(c);if(!o)continue;
+      B.push({name:'stamp_'+String(B.length+1).padStart(2,'0')+'.png',blob:await blobOf(o)});
+      $('grid').insertAdjacentHTML('beforeend','<div class="ck"><img src="'+o.toDataURL('image/png')+'"></div>')}catch(err){}
+    await new Promise(r=>setTimeout(r,0))}
+  $('bmsg').textContent=B.length+'枚できました（'+(fs.length-B.length)+'枚は失敗）';
+  if(B.length)$('zipb').style.display='block'};
+$('zipb').onclick=async()=>{
+  try{const files=[];for(const b of B)files.push({name:b.name,data:new Uint8Array(await b.blob.arrayBuffer())});
+    await saveFile('stamps.zip',zip(files))}
+  catch(err){$('bmsg').textContent='ZIP保存に失敗しました。画像を長押しして1枚ずつ保存してください。'}};
 </script></body></html>
