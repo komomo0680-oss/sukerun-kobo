@@ -192,8 +192,9 @@ function mdel(i){if(confirm('このスタンプを削除しますか？')){cur.s
 function mdelSet(){if(confirm('セットごと削除しますか？')){S.sets=S.sets.filter(s=>s!==cur);sv();mhome()}}
 $('fMain').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;cur.main=await shrink(f,240);sv();mdetail()};
 $('fSt').onchange=async e=>{const fs=[...e.target.files];e.target.value='';for(const f of fs)cur.stamps.push(await shrink(f,370));sv();mdetail()};
-function pick(urls){$('pk').innerHTML='<div class="box"><b>どのセットに入れる？</b><select id="ps">'+S.sets.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'</option>').join('')+'<option value="">＋ 新しいセット</option></select><div class="row"><button class="main" id="pok" style="margin:0;flex:1">追加する（'+urls.length+'枚）</button><button id="pno">やめる</button></div></div>';$('pk').style.display='flex';
+function pick(urls){$('pk').innerHTML='<div class="box"><b>どのセットに入れる？</b><select id="ps"><option value="">＋ 新しいセットを作る</option>'+S.sets.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'（'+s.stamps.length+'個）</option>').join('')+'</select><input id="pn" class="nm" placeholder="新しいセットの名前" style="width:100%"><div class="row"><button class="main" id="pok" style="margin:0;flex:1">追加する（'+urls.length+'枚）</button><button id="pno">やめる</button></div></div>';$('pk').style.display='flex';
+$('ps').onchange=()=>{$('pn').style.display=$('ps').value?'none':''};
 $('pno').onclick=()=>$('pk').style.display='none';
-$('pok').onclick=()=>{let s=S.sets.find(x=>x.id===$('ps').value)||newSet();s.stamps.push(...urls);sv();$('pk').style.display='none';tab(2);mopen(s.id)}}
+$('pok').onclick=()=>{let s=S.sets.find(x=>x.id===$('ps').value);if(!s){s=newSet();const n=$('pn').value.trim();if(n)s.name=n}s.stamps.push(...urls);sv();$('pk').style.display='none';tab(2);mopen(s.id)}}
 dbOpen().then(dbLoad);
 </script></body></html>
