@@ -53,7 +53,7 @@ body.mgr{background:#000;color:#eee;--bg:#000;--fg:#eee;--card:#1c1c1c;--bd:#333
 <div class="card"><h2>書き出し設定（①②共通）</h2>
   <div class="row"><span>サイズ</span><select id="sz"><option value="370x320">スタンプ 370×320</option><option value="240x240">メイン 240×240</option><option value="96x74">タブ 96×74</option><option value="192x192">アイコン 192×192</option><option value="512x512">アイコン 512×512</option><option value="custom">自由に入力</option><option value="0x0">余白カットのみ</option></select></div>
   <div class="row" id="cr" style="display:none"><span>幅</span><input id="cw" type="number" min="16" max="2000" value="512" style="width:80px"><span>×　高さ</span><input id="ch2" type="number" min="16" max="2000" value="512" style="width:80px"><span>px</span></div>
-  <div class="row"><label><input id="bd" type="checkbox" checked> 白フチ</label><span>太さ</span><input id="bw" type="range" min="2" max="20" value="8"></div>
+  <div class="row"><span>白フチ</span><input id="bw" type="range" min="0" max="20" value="0"><span id="bwv">なし</span></div>
   <button id="exp" class="main">① の画像を書き出す</button>
   <div id="out" style="margin-top:8px"></div>
 </div>
@@ -125,12 +125,13 @@ function makeOut(s){
   const w=s.width,h=s.height,d=s.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;let x0=w,y0=h,x1=-1,y1=-1;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(d[(y*w+x)*4+3]>8){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
   if(x1<0)return null;
-  const cw=x1-x0+1,ch=y1-y0+1,[W,H]=sizeVal(),b=$('bd').checked?+$('bw').value:0,m=W>100?10:4;
+  const cw=x1-x0+1,ch=y1-y0+1,[W,H]=sizeVal(),b=+$('bw').value,m=W>100?10:4;
   const k=W?Math.min((W-2*m-2*b)/cw,(H-2*m-2*b)/ch):1,dw=Math.max(1,Math.round(cw*k)),dh=Math.max(1,Math.round(ch*k)),im=mk(dw,dh),c=im.getContext('2d');
   c.imageSmoothingQuality='high';c.drawImage(s,x0,y0,cw,ch,0,0,dw,dh);
   const f=b?outline(im,b):im,o=mk(W||f.width,H||f.height);
   o.getContext('2d').drawImage(f,Math.round((o.width-f.width)/2),Math.round((o.height-f.height)/2));return o}
 function sizeVal(){const v=$('sz').value;if(v==='custom'){const f=id=>Math.min(2000,Math.max(16,+$(id).value||512));return[f('cw'),f('ch2')]}return v.split('x').map(Number)}
+$('bw').oninput=()=>{$('bwv').textContent=+$('bw').value?$('bw').value+'px':'なし'};
 $('sz').onchange=()=>{$('cr').style.display=$('sz').value==='custom'?'flex':'none'};
 const blobOf=c=>new Promise(r=>c.toBlob(r,'image/png'));
 $('exp').onclick=async()=>{
@@ -177,11 +178,18 @@ const sv=()=>{try{if(db)db.transaction('kv','readwrite').objectStore('kv').put(S
 async function shrink(f,m){const im=await readImg(f),k=Math.min(1,m/Math.max(im.width,im.height)),c=mk(Math.round(im.width*k),Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);return c.toDataURL('image/png')}
 function tab(n){document.body.classList.toggle('mgr',n==2);$('tA').style.display=n==1?'':'none';$('tB').style.display=n==2?'':'none';$('t1').className=n==1?'on':'';$('t2').className=n==2?'on':'';if(n==2)mhome()}
 $('t1').onclick=()=>tab(1);$('t2').onclick=()=>tab(2);
-function newSet(){const s={id:'s'+Date.now(),name:'新しいスタンプ',main:'',stamps:[]};S.sets.push(s);sv();return s}
-function mhome(){cur=null;$('mg').innerHTML='<div class="sgrid">'+S.sets.map(s=>{const ic=s.main||s.stamps[0];return '<div class="sc" onclick="mopen(\''+s.id+'\')">'+(ic?'<img class="ic" src="'+ic+'">':'<div class="ic">画像なし</div>')+'<b>'+esc(s.name)+'</b><small>'+s.stamps.length+'個</small></div>'}).join('')+'<div class="sc add" onclick="mopen(newSet().id)">＋<small>新しいセット</small></div></div>'+(S.sets.length?'<small>アイコンをタップすると中身を一覧で見られます</small>':'<small>「背景透過」で作った画像を、セットに追加できます</small>')}
+function newSet(){const s={id:'s'+Date.now(),name:'新しいスタンプ',size:'370x320',main:'',stamps:[]};S.sets.push(s);sv();return s}
+function mhome(){cur=null;$('mg').innerHTML='<div class="sgrid">'+S.sets.map(s=>{const ic=s.main||s.stamps[0];return '<div class="sc" onclick="mopen(\''+s.id+'\')">'+(ic?'<img class="ic" src="'+ic+'">':'<div class="ic">画像なし</div>')+'<b>'+esc(s.name)+'</b><small>'+s.stamps.length+'個</small></div>'}).join('')+'<div class="sc add" onclick="mnewNamed()">＋<small>新しいセット</small></div></div>'+(S.sets.length?'<small>アイコンをタップすると中身を一覧で見られます</small>':'<small>「背景透過」で作った画像を、セットに追加できます</small>')}
+function mnewNamed(){const n=prompt('セットの名前を入れてください','新しいスタンプ');if(n===null)return;const s=newSet();s.name=n.trim()||s.name;sv();mopen(s.id)}
+const SZ=[['370x320','スタンプ 370×320'],['240x240','メイン 240×240'],['96x74','タブ 96×74']];
+async function fitTo(u,v){const[W,H]=v.split('x').map(Number),im=await ldImg(u);if(!im)return u;const w=im.naturalWidth,h=im.naturalHeight,c=mk(w,h),x=c.getContext('2d',{willReadFrequently:true});x.drawImage(im,0,0);const d=x.getImageData(0,0,w,h).data;let x0=w,y0=h,x1=-1,y1=-1;
+ for(let y=0;y<h;y++)for(let xx=0;xx<w;xx++)if(d[(y*w+xx)*4+3]>8){if(xx<x0)x0=xx;if(xx>x1)x1=xx;if(y<y0)y0=y;if(y>y1)y1=y}
+ if(x1<0)return u;const cw=x1-x0+1,ch=y1-y0+1,m=W>100?10:4,k=Math.min((W-2*m)/cw,(H-2*m)/ch),dw=Math.max(1,Math.round(cw*k)),dh=Math.max(1,Math.round(ch*k)),o=mk(W,H),oc=o.getContext('2d');
+ oc.imageSmoothingQuality='high';oc.drawImage(c,x0,y0,cw,ch,Math.round((W-dw)/2),Math.round((H-dh)/2),dw,dh);return o.toDataURL('image/png')}
+async function msize(v){cur.size=v;if(cur.stamps.length&&confirm('セットの中の画像も、このサイズに合わせ直しますか？')){for(let i=0;i<cur.stamps.length;i++)cur.stamps[i]=await fitTo(cur.stamps[i],v)}sv();mdetail()}
 function mopen(id){cur=S.sets.find(s=>s.id===id);mdetail()}
 function mdetail(){const s=cur;$('mg').innerHTML='<div class="row"><button onclick="mhome()">‹ 戻る</button><input class="nm" value="'+esc(s.name)+'" onchange="cur.name=this.value;sv()"></div>'
-+'<div class="row">'+(s.main?'<img src="'+s.main+'" style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid var(--bd)">':'')+'<button onclick="$(\'fMain\').click()">トップ画像を'+(s.main?'変更':'選ぶ')+'</button><button class="on" onclick="$(\'fSt\').click()">＋ スタンプを追加</button><button onclick="mcheck()">✔ 申請前チェック</button></div><div id="ck"></div>'
++'<div class="row">'+(s.main?'<img src="'+s.main+'" style="width:64px;height:64px;object-fit:contain;border-radius:8px;border:1px solid var(--bd)">':'')+'<button onclick="$(\'fMain\').click()">トップ画像を'+(s.main?'変更':'選ぶ')+'</button><button class="on" onclick="$(\'fSt\').click()">＋ スタンプを追加</button><button onclick="mcheck()">✔ 申請前チェック</button></div><div class="row"><span>サイズ</span><select onchange="msize(this.value)">'+SZ.map(z=>'<option value="'+z[0]+'"'+((s.size||'370x320')===z[0]?' selected':'')+'>'+z[1]+'</option>').join('')+'</select><small>少し小さめに収めます</small></div><div id="ck"></div>'
 +'<small>'+s.stamps.length+'個</small><div class="sgrid" style="margin-top:6px">'+s.stamps.map((d,i)=>'<div class="cell"><img src="'+d+'"><i>'+(i+1)+'</i><button onclick="mdel('+i+')">×</button><button class="dl" onclick="msave([cur.stamps['+i+']],cur.name)">⬇</button></div>').join('')+'</div>'
 +'<div class="row">'+(s.stamps.length?'<button onclick="msave(cur.stamps,cur.name)">⬇ 全部保存</button>':'')+'<button onclick="mdelSet()" style="color:#d33">このセットを削除</button></div>'}
 async function msave(urls,base){
@@ -190,12 +198,12 @@ async function msave(urls,base){
  for(const f of fs)await saveFile(f.name,f)}
 function mdel(i){if(confirm('このスタンプを削除しますか？')){cur.stamps.splice(i,1);sv();mdetail()}}
 function mdelSet(){if(confirm('セットごと削除しますか？')){S.sets=S.sets.filter(s=>s!==cur);sv();mhome()}}
-$('fMain').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;cur.main=await shrink(f,240);sv();mdetail()};
-$('fSt').onchange=async e=>{const fs=[...e.target.files];e.target.value='';for(const f of fs)cur.stamps.push(await shrink(f,370));sv();mdetail()};
+$('fMain').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;cur.main=await fitTo(await shrink(f,1000),'240x240');sv();mdetail()};
+$('fSt').onchange=async e=>{const fs=[...e.target.files];e.target.value='';for(const f of fs)cur.stamps.push(await fitTo(await shrink(f,1000),cur.size||'370x320'));sv();mdetail()};
 function pick(urls){$('pk').innerHTML='<div class="box"><b>どのセットに入れる？</b><select id="ps"><option value="">＋ 新しいセットを作る</option>'+S.sets.map(s=>'<option value="'+s.id+'">'+esc(s.name)+'（'+s.stamps.length+'個）</option>').join('')+'</select><input id="pn" class="nm" placeholder="新しいセットの名前" style="width:100%"><div class="row"><button class="main" id="pok" style="margin:0;flex:1">追加する（'+urls.length+'枚）</button><button id="pno">やめる</button></div></div>';$('pk').style.display='flex';
 $('ps').onchange=()=>{$('pn').style.display=$('ps').value?'none':''};
 $('pno').onclick=()=>$('pk').style.display='none';
-$('pok').onclick=()=>{let s=S.sets.find(x=>x.id===$('ps').value);if(!s){s=newSet();const n=$('pn').value.trim();if(n)s.name=n}s.stamps.push(...urls);sv();$('pk').style.display='none';tab(2);mopen(s.id)}}
+$('pok').onclick=async()=>{let s=S.sets.find(x=>x.id===$('ps').value);if(!s){s=newSet();const n=$('pn').value.trim();if(n)s.name=n}const v=s.size||'370x320';for(const u of urls){const im=await ldImg(u);s.stamps.push(im&&im.naturalWidth+'x'+im.naturalHeight===v?u:await fitTo(u,v))}sv();$('pk').style.display='none';tab(2);mopen(s.id)}}
 
 /* ---- 申請前チェック ---- */
 const OKN=[8,16,24,32,40],GN=24;
